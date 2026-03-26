@@ -1,5 +1,7 @@
 # ComfyUI EvalKit
 
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
 > Image evaluation nodes for ComfyUI.
 > Score, rank, preview, and export image results with single metrics or weighted presets.
 
@@ -124,53 +126,3 @@ The path ranking nodes output a JSON `report` that usually includes:
 - `original` is often best for practical selection, not strict benchmarking
 - Alignment metrics only make sense when prompt text is available
 - Supported image formats include `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, and `tiff`
-
----
-
-## 中文说明
-
-### ✨ 功能
-
-- 📊 对 `IMAGE` 或 `IMAGE batch` 进行单指标打分
-- 🏆 对同尺寸 batch 做单指标或综合排序
-- 📁 直接从文件夹逐张读取图片并排序，不要求先整理成同尺寸 batch
-- 📝 自动读取同名 `.txt` 或图片元数据中的 prompt
-- 📦 输出 `report` 供预览、导出和后续处理节点复用
-
-### 🧠 支持的评测指标 / 模型
-
-本项目通过 `pyiqa` 调用评测模型，当前支持：
-
-- 质量类：`hyperiqa`、`dbcnn`、`qualiclip+`、`qualiclip+-spaq`、`maniqa`、`arniqa-spaq`、`topiq_nr`、`topiq_nr-spaq`
-- 美学类：`clipiqa+_vitL14_512`、`musiq-ava`、`laion_aes`、`paq2piq`
-- 对齐类：`clipscore`
-
-### 🧩 主要节点
-
-- `EvalKit Metric Score`：单指标打分
-- `EvalKit Metric Rank`：同分辨率 batch 单指标排序
-- `EvalKit Preset Rank`：同分辨率 batch 综合排序
-- `EvalKit Batch Load From Path`：从文件夹读取并整理为标准 batch
-- `EvalKit Metric Rank From Path`：从文件夹逐张单指标排序
-- `EvalKit Preset Rank From Path`：从文件夹逐张综合排序
-- `EvalKit Ranking Preview`：预览 top / bottom N
-- `EvalKit Ranking Export`：导出 top / bottom N
-- `EvalKit Score Summary`：多分数加权汇总
-
-### ⚖️ compare_mode
-
-- `original`：保持原图尺寸和比例，不拉伸、不补边
-- `pad`：等比缩放后补黑边到目标尺寸
-- `resize`：直接缩放到目标尺寸
-
-### 📝 prompt 读取优先级
-
-1. `prompt_folder_path` 下同名 `.txt`
-2. 图片目录下同名 `.txt`
-3. 图片元数据中的 prompt 字段
-
-### ⚠️ 注意事项
-
-- 不同分辨率图片直接比较时，分数可能受到尺寸差异影响
-- `clipscore` 等对齐类指标依赖 prompt
-- 路径节点支持 `png`、`jpg`、`jpeg`、`webp`、`bmp`、`tif`、`tiff`
