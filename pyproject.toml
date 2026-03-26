@@ -1,0 +1,5 @@
+[project]
+name = "comfyui-evalkit"
+version = "0.1.0"
+description = "Phase 1 evaluation nodes for ComfyUI"
+dependencies = ["pyiqa", "setuptools<81"]
