@@ -1,136 +1,125 @@
 # ComfyUI EvalKit
 
-ComfyUI 文生图评测节点包，适合做单图打分、批量路径排序、排名预览与导出。
+ComfyUI 文生图评测节点包，用于单指标打分、批量排序、综合排名、结果预览与导出。
+
+## 这个项目能做什么
+
+- 对 `IMAGE` 或 `IMAGE batch` 计算单一评测指标分数
+- 对同尺寸 batch 做单指标或多指标综合排序
+- 直接从文件夹读取图片并逐张评分，不要求先整理成同尺寸 batch
+- 自动读取同名 `.txt` 或图片元数据中的 prompt
+- 生成 `report`，供预览、导出、二次处理节点复用
+
+## 支持的评测指标 / 模型
+
+本项目通过 `pyiqa` 调用评测模型，当前内置这些指标：
+
+- 质量类：`hyperiqa`、`dbcnn`、`qualiclip+`、`qualiclip+-spaq`、`maniqa`、`arniqa-spaq`、`topiq_nr`、`topiq_nr-spaq`
+- 美学类：`clipiqa+_vitL14_512`、`musiq-ava`、`laion_aes`、`paq2piq`
+- 对齐类：`clipscore`
+
+说明：
+
+- 综合排序节点默认使用 `qualiclip+`、`laion_aes`、`clipscore`
+- 对齐类指标依赖 prompt，没有 prompt 时不适合使用
+- 当前代码里所有内置指标默认都是“分数越高越好”
 
 ## 安装
 
-将本目录放入 `ComfyUI/custom_nodes` 后，安装依赖：
+将本目录放入 `ComfyUI/custom_nodes` 后，在 ComfyUI 对应 Python 环境中安装依赖：
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-如果使用 `pyiqa` 相关指标，建议在当前 ComfyUI 虚拟环境内安装依赖。
+依赖：
 
-## 主要节点
+- `pyiqa`
+- `setuptools<81`
 
-### 基础评分
+如果遇到 `pkg_resources` 相关报错，通常是当前环境缺少兼容版本的 `setuptools`。
+
+## 节点一览
+
+### 评分与排序
 
 - `EvalKit Metric Score`
-  - 对输入 `IMAGE` 批量打单一指标分数
+  - 对输入 `IMAGE` 计算单一指标，输出均值、最小值、最大值和 `report`
 - `EvalKit Metric Rank`
-  - 对同分辨率 `IMAGE batch` 做单一指标排序
+  - 对同分辨率 `IMAGE batch` 按单一指标排序，输出排序后的 batch 与最佳图
 - `EvalKit Preset Rank`
-  - 对同分辨率 `IMAGE batch` 做质量 / 美学 / 对齐综合排序
+  - 对同分辨率 `IMAGE batch` 按质量 / 美学 / 对齐三类指标加权综合排序
 
-### 路径排序
+### 路径工作流
 
+- `EvalKit Batch Load From Path`
+  - 从文件夹读取图片，统一成标准 batch，适合接普通 batch 节点
 - `EvalKit Metric Rank From Path`
-  - 直接从文件夹逐张加载图片并按单指标排序
+  - 逐张读取文件夹图片并按单一指标排序，适合不同分辨率图片直接筛选
 - `EvalKit Preset Rank From Path`
-  - 直接从文件夹逐张加载图片并按综合指标排序
+  - 逐张读取文件夹图片并按综合分数排序，适合真实出图目录的批量挑图
 
-这两个路径节点支持：
-
-- 自动读取图片目录
-- 自动尝试加载同名 `.txt`
-- 如果没有提供 `prompt_folder_path`，会继续尝试读取图片元数据中的 prompt
-- 输出 `report` 供后续预览和导出节点使用
-
-### 排名结果处理
+### 结果处理
 
 - `EvalKit Ranking Preview`
-  - 预览 top / bottom N
+  - 预览 `report` 中 top / bottom N 的拼图与摘要
 - `EvalKit Ranking Export`
-  - 导出 top / bottom N 图片，可附带导出同名 txt
+  - 导出 top / bottom N 图片，可选导出同名 txt prompt
 - `EvalKit Score Summary`
   - 对多个外部分数做加权汇总
 
-## compare_mode
+## compare_mode 说明
 
-`EvalKit Metric Rank From Path` 和 `EvalKit Preset Rank From Path` 支持 `compare_mode`：
+`EvalKit Metric Rank From Path` 和 `EvalKit Preset Rank From Path` 支持 3 种比较方式：
 
-- `original`
-  - 保持原图尺寸和比例
-  - 不拉伸，不补黑边
-  - 适合真实成图筛选
-- `pad`
-  - 保持比例缩放后补黑边到目标尺寸
-  - 适合希望减少尺寸差异但不想拉伸的情况
-- `resize`
-  - 直接缩放到目标尺寸
-  - 适合需要标准化对比的情况
+- `original`：保持原图尺寸与比例，不拉伸、不补边，适合日常筛图
+- `pad`：等比缩放后补黑边到目标尺寸，适合减少尺寸差异
+- `resize`：直接缩放到目标尺寸，适合严格标准化对比
 
 建议：
 
-- 日常挑图：优先用 `original`
-- 做模型实验横向对比：优先用 `pad` 或 `resize`
+- 日常挑图优先用 `original`
+- 做横向 benchmark 优先用 `pad` 或 `resize`
 
 ## prompt 读取规则
 
-路径节点读取 prompt 的优先级：
+路径类节点会按以下优先级读取 prompt：
 
-1. `prompt_folder_path` 下同名 txt
-2. 图片目录下同名 txt
-3. 图片元数据中的 prompt / parameters / comment
+1. `prompt_folder_path` 下同名 `.txt`
+2. 图片目录下同名 `.txt`
+3. 图片元数据中的 `prompt` / `parameters` / `Description` / `Comment`
 
-如果缺少 prompt：
+当 prompt 缺失时：
 
-- 对齐类单指标节点会直接提示无法执行
-- 综合排序节点会提醒你关闭对齐类指标，并在必要时自动跳过对齐类指标
+- `clipscore` 这类对齐类单指标节点会直接报错
+- 综合排序节点会给出提醒，并在必要时自动关闭对齐类指标
 
-## 推荐工作流
+## 推荐用法
 
-### 保持原图比例排序
+### 真实出图目录挑图
 
-`EvalKit Preset Rank From Path`
-
+- 使用 `EvalKit Preset Rank From Path`
 - `compare_mode = original`
-- 获取 `report`
+- 将输出 `report` 接到 `EvalKit Ranking Preview` 或 `EvalKit Ranking Export`
 
-再接：
+### 同一批图做标准化对比
 
-- `EvalKit Ranking Preview`
-- `EvalKit Ranking Export`
+- 方式一：`EvalKit Preset Rank From Path` + `compare_mode = pad/resize`
+- 方式二：`EvalKit Batch Load From Path` → `EvalKit Preset Rank`
 
-### 标准化对比
+## report 包含什么
 
-方式一：
+路径排序节点输出的 `report` 是 JSON 字符串，通常包含：
 
-- `EvalKit Preset Rank From Path`
-- `compare_mode = pad` 或 `resize`
-
-方式二：
-
-- `EvalKit Batch Load From Path`
-- `EvalKit Preset Rank`
-
-## report 的用途
-
-路径排序节点输出的 `report` 是 JSON 字符串，包含：
-
-- 文件名
-- 图片路径
-- prompt 来源
-- 各项分数
-- 排名
-- warning
-
-可以直接接到：
-
-- `EvalKit Ranking Preview`
-- `EvalKit Ranking Export`
-
-## 节点职责说明
-
-当前没有删除旧节点，原因是它们仍然有不同职责：
-
-- `Batch Load From Path`：适合需要输出标准 `IMAGE batch` 的工作流
-- `Rank From Path`：适合不同分辨率图片直接逐张评分排序
-- `Ranking Preview / Export`：适合处理路径排名结果
+- 文件名与图片路径
+- prompt 内容、来源与 txt 路径
+- 原始尺寸与处理后尺寸
+- 单项分数或综合分数
+- 排名与 warning
 
 ## 注意事项
 
-- 不同分辨率图片直接比较时，分数可能会受到尺寸差异影响
-- `original` 模式更适合筛图，不一定适合严格 benchmark
-- `clipscore` 等对齐类指标依赖 prompt，缺少 prompt 时结果没有意义
+- 不同分辨率图片直接比较时，分数会受到尺寸差异影响
+- `original` 更适合筛图，不一定适合严格 benchmark
+- 对齐类指标必须结合 prompt 才有意义
+- 路径节点支持的图片格式包括 `png`、`jpg`、`jpeg`、`webp`、`bmp`、`tif`、`tiff`
