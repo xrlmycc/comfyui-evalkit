@@ -7,9 +7,10 @@
 
 ## ✨ Features
 
-- 📊 Score `IMAGE` or `IMAGE batch` with a single evaluation metric
-- 🏆 Rank same-size batches by one metric or by weighted preset scores
+- 📊 `EvalKit Metric Score` can score connected `IMAGE` / `IMAGE batch` inputs
+- 🏆 `EvalKit Metric Rank` and `EvalKit Preset Rank` can rank connected `IMAGE` / `IMAGE batch` inputs
 - 📁 Rank images directly from a folder without building a fixed-size batch first
+- 🖼️ Ranking nodes support `separate / pad / resize / crop` resolution handling modes
 - 📝 Auto-load prompts from matching `.txt` files or image metadata
 - 📦 Reuse JSON `report` output for preview and export workflows
 
@@ -47,20 +48,20 @@ If you see a `pkg_resources` error, the environment usually needs a compatible `
 ### Scoring & Ranking
 
 - `EvalKit Metric Score`
-  - Score input `IMAGE` with one metric and return mean / min / max / count / report
+  - Score input `IMAGE` / `IMAGE batch` with one metric, with `separate / pad / resize / crop`
 - `EvalKit Metric Rank`
-  - Rank a same-resolution `IMAGE batch` by one metric
+  - Rank input `IMAGE` / `IMAGE batch` by one metric and output `ranked_images` + `best_image`
 - `EvalKit Preset Rank`
-  - Rank a same-resolution `IMAGE batch` with weighted quality / aesthetic / alignment scores
+  - Rank input `IMAGE` / `IMAGE batch` with weighted quality / aesthetic / alignment scores and output `ranked_images`, `best_image`, `quality_image`, `aesthetic_image`, and `alignment_image`
 
 ### Folder-Based Workflow
 
 - `EvalKit Batch Load From Path`
-  - Load images from a folder and normalize them into a standard batch
+  - Load images from a folder and normalize them into a standard batch with pad / stretch / crop
 - `EvalKit Metric Rank From Path`
-  - Read images one by one from a folder and rank them by a single metric
+  - Read images one by one from a folder, rank them by a single metric, and output the full ranked batch
 - `EvalKit Preset Rank From Path`
-  - Read images one by one from a folder and rank them by a weighted preset
+  - Read images one by one from a folder, rank them by a weighted preset, and output the full ranked batch plus the top image for each metric; Enabling `alignment_metric` requires a prompt; otherwise, alignment metrics sorting will be skipped.
 
 ### Result Processing
 
@@ -73,20 +74,27 @@ If you see a `pkg_resources` error, the environment usually needs a compatible `
 
 ## ⚖️ compare_mode
 
-`EvalKit Metric Rank From Path` and `EvalKit Preset Rank From Path` support 3 compare modes:
+`EvalKit Metric Score`, `EvalKit Metric Rank`, `EvalKit Preset Rank`, `EvalKit Metric Rank From Path`, and `EvalKit Preset Rank From Path` support 4 compare modes:
 
-- `original` — keep original size and aspect ratio, no stretch, no padding
+- `separate` — score each image at its original resolution, this is the default
 - `pad` — scale with aspect ratio preserved, then pad to target size
-- `resize` — directly resize to target size
+- `resize` — directly stretch to target size
+- `crop` — scale to fill, then center crop to target size
+
+Notes:
+
+- `separate` does not change the image size used for scoring
+- In `separate`, images are still scored one by one at their original sizes even if resolutions differ
+- `ranked_images` only pads smaller images with black borders to build a valid ComfyUI IMAGE batch, without cropping or stretching
 
 Recommended usage:
 
-- Use `original` for real-world image picking
-- Use `pad` or `resize` for more standardized comparisons
+- Use `separate` for real-world image picking
+- Use `pad`, `resize`, or `crop` for more standardized comparisons
 
 ## 📝 Prompt Loading Rules
 
-Folder-based nodes read prompt text in this order:
+Path-based nodes read prompt text in this order:
 
 1. Matching `.txt` under `prompt_folder_path`
 2. Matching `.txt` in the image folder
@@ -95,24 +103,24 @@ Folder-based nodes read prompt text in this order:
 If prompt text is missing:
 
 - Alignment-only ranking with `clipscore` cannot run
-- Preset ranking warns and can automatically disable alignment scoring when needed
+- `EvalKit Preset Rank From Path` raises an error when `alignment_metric` is enabled, Alignment-related metrics will be skipped in the sorting process.
 
 ## 🔧 Recommended Workflows
 
 ### Pick the best image from a real output folder
 
 - `EvalKit Preset Rank From Path`
-- `compare_mode = original`
+- `compare_mode = separate`
 - Send the `report` output into `EvalKit Ranking Preview` or `EvalKit Ranking Export`
 
 ### Run more standardized comparisons
 
-- Option A: `EvalKit Preset Rank From Path` with `compare_mode = pad` or `resize`
+- Option A: `EvalKit Preset Rank From Path` with `compare_mode = pad` / `resize` / `crop`
 - Option B: `EvalKit Batch Load From Path` → `EvalKit Preset Rank`
 
 ## 📄 What's Inside report
 
-The path ranking nodes output a JSON `report` that usually includes:
+Scoring and ranking nodes output a JSON `report` that usually includes:
 
 - file names and image paths
 - prompt text, source, and prompt file path
@@ -123,6 +131,7 @@ The path ranking nodes output a JSON `report` that usually includes:
 ## ⚠️ Notes
 
 - Comparing different resolutions can affect scores
-- `original` is often best for practical selection, not strict benchmarking
+- `separate` is often best for practical selection, not strict benchmarking
+- In `separate`, `ranked_images` may appear larger because batch output uses black padding for mixed resolutions
 - Alignment metrics only make sense when prompt text is available
-- Supported image formats include `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, and `tiff`
+- Path nodes support `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, and `tiff`

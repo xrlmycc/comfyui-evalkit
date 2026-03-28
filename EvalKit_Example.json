@@ -1,0 +1,774 @@
+{
+  "id": "a752c7e8-0165-411a-9bff-1b39e0d7c7f9",
+  "revision": 0,
+  "last_node_id": 252,
+  "last_link_id": 460,
+  "nodes": [
+    {
+      "id": 211,
+      "type": "ImageBatchMulti",
+      "pos": [
+        254.55996622597223,
+        410.9879032377495
+      ],
+      "size": [
+        270,
+        262
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 451
+        },
+        {
+          "name": "image_2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 452
+        },
+        {
+          "name": "image_3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 421
+        },
+        {
+          "name": "image_4",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 422
+        },
+        {
+          "name": "image_5",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 423
+        },
+        {
+          "name": "image_6",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 424
+        },
+        {
+          "name": "image_7",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 425
+        },
+        {
+          "name": "image_8",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 426
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            454
+          ]
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        8,
+        null
+      ]
+    },
+    {
+      "id": 220,
+      "type": "PreviewImage",
+      "pos": [
+        958.6339236177779,
+        384.95895106099357
+      ],
+      "size": [
+        210,
+        462.82499836891566
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 455
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 221,
+      "type": "PreviewImage",
+      "pos": [
+        1401.5494832561162,
+        392.8994528136786
+      ],
+      "size": [
+        210,
+        258
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 457
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 223,
+      "type": "LoadImage",
+      "pos": [
+        -290.49128211694614,
+        411.99332050742277
+      ],
+      "size": [
+        217.6090176836252,
+        326
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            452
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ffaba3d5ab760d3f7c52_d5f26b3f.webp",
+        "image"
+      ]
+    },
+    {
+      "id": 224,
+      "type": "LoadImage",
+      "pos": [
+        -62.2897869556446,
+        415.4022711529125
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            451
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "微信图片_20251105143819_8377_158.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 225,
+      "type": "LoadImage",
+      "pos": [
+        -284.5825518856866,
+        784.1843414234448
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            421
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "8a63a9b6d7efa2e4659d28c6230a2106.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 226,
+      "type": "LoadImage",
+      "pos": [
+        -59.22133462908909,
+        789.5261622277628
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            422
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "Alcampo7-min-683x1024-1.png",
+        "image"
+      ]
+    },
+    {
+      "id": 227,
+      "type": "LoadImage",
+      "pos": [
+        -291.7422739809832,
+        1157.0581222911803
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            423
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "output.png",
+        "image"
+      ]
+    },
+    {
+      "id": 228,
+      "type": "LoadImage",
+      "pos": [
+        -55.721907706088295,
+        1163.4332435190083
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            424
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "Single_image_00001_dyupy_1772791136.png",
+        "image"
+      ]
+    },
+    {
+      "id": 229,
+      "type": "LoadImage",
+      "pos": [
+        -294.0634193979329,
+        1535.436538555613
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            425
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "8c25bdb423690f31dc4296d33b19fc06.jpeg",
+        "image"
+      ]
+    },
+    {
+      "id": 230,
+      "type": "LoadImage",
+      "pos": [
+        -51.12619334706926,
+        1540.436538555613
+      ],
+      "size": [
+        210,
+        326
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            426
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "u=2807824930,62308410&fm=253&app=138&f=JPEG.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 233,
+      "type": "PreviewImage",
+      "pos": [
+        1406.525559363019,
+        691.475037324781
+      ],
+      "size": [
+        200.35025903306223,
+        246
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 459
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 243,
+      "type": "ShowText|pysssss",
+      "pos": [
+        1181.489783565566,
+        395.54340746270987
+      ],
+      "size": [
+        210,
+        396.1132007615683
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 456
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "shape": 6,
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        "{\n  \"source_mode\": \"image\",\n  \"compare_mode\": \"separate\",\n  \"target_size\": [\n    1024,\n    1024\n  ],\n  \"best_index\": 5,\n  \"best_combined_score\": 0.9328230574379024,\n  \"metric_best_indexes\": {\n    \"quality\": 5,\n    \"aesthetic\": 4,\n    \"alignment\": 5\n  },\n  \"metrics\": {\n    \"quality\": {\n      \"metric\": \"qualiclip+\",\n      \"weight\": 1.0,\n      \"scores\": [\n        0.6702773571014404,\n        0.5967073440551758,\n        0.5902624130249023,\n        0.44339412450790405,\n        0.6293970346450806,\n        0.6749987006187439,\n        0.4956412613391876,\n        0.4983515739440918\n      ],\n      \"normalized_scores\": [\n        0.9796146363056145,\n        0.6619610981861604,\n        0.6341337938275926,\n        0.0,\n        0.8031055053426942,\n        1.0,\n        0.22558767062650553,\n        0.23728999814704246\n      ],\n      \"mean\": 0.5748787261545658\n    },\n    \"aesthetic\": {\n      \"metric\": \"laion_aes\",\n      \"weight\": 1.0,\n      \"scores\": [\n        5.078491687774658,\n        5.579460144042969,\n        5.087383270263672,\n        5.2237701416015625,\n        5.672867774963379,\n        5.54921817779541,\n        5.487146377563477,\n        4.752540111541748\n      ],\n      \"normalized_scores\": [\n        0.3541690521624379,\n        0.8985061140364557,\n        0.3638303748004603,\n        0.5120241939787582,\n        1.0,\n        0.8656461148758048,\n        0.7982007878482975,\n        0.0\n      ],\n      \"mean\": 5.303859710693359\n    },\n    \"alignment\": {\n      \"metric\": \"disabled\",\n      \"weight\": 0.0,\n      \"scores\": [],\n      \"normalized_scores\": [],\n      \"mean\": 0.0\n    }\n  },\n  \"warnings\": [\n    \"检测到 8/8 张输入图片缺少 prompt。\",\n    \"已自动关闭对齐类指标，本次综合排名不会计算 alignment_metric。\"\n  ],\n  \"ranking\": [\n    {\n      \"rank\": 1,\n      \"index\": 5,\n      \"file_name\": \"input_0005\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.9328230574379024,\n      \"quality_score\": 0.6749987006187439,\n      \"aesthetic_score\": 5.54921817779541,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 2,\n      \"index\": 4,\n      \"file_name\": \"input_0004\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.9015527526713472,\n      \"quality_score\": 0.6293970346450806,\n      \"aesthetic_score\": 5.672867774963379,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 3,\n      \"index\": 1,\n      \"file_name\": \"input_0001\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.7802336061113081,\n      \"quality_score\": 0.5967073440551758,\n      \"aesthetic_score\": 5.579460144042969,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 4,\n      \"index\": 0,\n      \"file_name\": \"input_0000\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.6668918442340261,\n      \"quality_score\": 0.6702773571014404,\n      \"aesthetic_score\": 5.078491687774658,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 5,\n      \"index\": 6,\n      \"file_name\": \"input_0006\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.5118942292374016,\n      \"quality_score\": 0.4956412613391876,\n      \"aesthetic_score\": 5.487146377563477,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 6,\n      \"index\": 2,\n      \"file_name\": \"input_0002\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.49898208431402646,\n      \"quality_score\": 0.5902624130249023,\n      \"aesthetic_score\": 5.087383270263672,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 7,\n      \"index\": 3,\n      \"file_name\": \"input_0003\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.2560120969893791,\n      \"quality_score\": 0.44339412450790405,\n      \"aesthetic_score\": 5.2237701416015625,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    },\n    {\n      \"rank\": 8,\n      \"index\": 7,\n      \"file_name\": \"input_0007\",\n      \"image_path\": \"\",\n      \"prompt_text\": \"\",\n      \"prompt_source\": \"input\",\n      \"prompt_path\": \"\",\n      \"combined_score\": 0.11864499907352123,\n      \"quality_score\": 0.4983515739440918,\n      \"aesthetic_score\": 4.752540111541748,\n      \"alignment_score\": null,\n      \"original_size\": [\n        1706,\n        1279\n      ],\n      \"processed_size\": [\n        1706,\n        1279\n      ]\n    }\n  ],\n  \"total_weight\": 2.0\n}"
+      ]
+    },
+    {
+      "id": 246,
+      "type": "PreviewImage",
+      "pos": [
+        1622.3572815630957,
+        392.92056246356145
+      ],
+      "size": [
+        200.35025903306223,
+        246
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 458
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 247,
+      "type": "PreviewImage",
+      "pos": [
+        1627.670683705833,
+        685.2161887695879
+      ],
+      "size": [
+        200.35025903306223,
+        246
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 460
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 252,
+      "type": "EvalKitPresetRank",
+      "pos": [
+        544.9609865610184,
+        406.12234477471173
+      ],
+      "size": [
+        400,
+        428
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 454
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ranked_images",
+          "type": "IMAGE",
+          "links": [
+            455
+          ]
+        },
+        {
+          "name": "best_image",
+          "type": "IMAGE",
+          "links": [
+            457
+          ]
+        },
+        {
+          "name": "quality_image",
+          "type": "IMAGE",
+          "links": [
+            458
+          ]
+        },
+        {
+          "name": "aesthetic_image",
+          "type": "IMAGE",
+          "links": [
+            459
+          ]
+        },
+        {
+          "name": "alignment_image",
+          "type": "IMAGE",
+          "links": [
+            460
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [
+            456
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EvalKitPresetRank"
+      },
+      "widgets_values": [
+        "space",
+        "separate",
+        1024,
+        1024,
+        "qualiclip+",
+        "laion_aes",
+        "clipscore",
+        1,
+        1,
+        1,
+        "auto"
+      ]
+    }
+  ],
+  "links": [
+    [
+      421,
+      225,
+      0,
+      211,
+      2,
+      "IMAGE"
+    ],
+    [
+      422,
+      226,
+      0,
+      211,
+      3,
+      "IMAGE"
+    ],
+    [
+      423,
+      227,
+      0,
+      211,
+      4,
+      "IMAGE"
+    ],
+    [
+      424,
+      228,
+      0,
+      211,
+      5,
+      "IMAGE"
+    ],
+    [
+      425,
+      229,
+      0,
+      211,
+      6,
+      "IMAGE"
+    ],
+    [
+      426,
+      230,
+      0,
+      211,
+      7,
+      "IMAGE"
+    ],
+    [
+      451,
+      224,
+      0,
+      211,
+      0,
+      "IMAGE"
+    ],
+    [
+      452,
+      223,
+      0,
+      211,
+      1,
+      "IMAGE"
+    ],
+    [
+      454,
+      211,
+      0,
+      252,
+      0,
+      "IMAGE"
+    ],
+    [
+      455,
+      252,
+      0,
+      220,
+      0,
+      "IMAGE"
+    ],
+    [
+      456,
+      252,
+      5,
+      243,
+      0,
+      "STRING"
+    ],
+    [
+      457,
+      252,
+      1,
+      221,
+      0,
+      "IMAGE"
+    ],
+    [
+      458,
+      252,
+      2,
+      246,
+      0,
+      "IMAGE"
+    ],
+    [
+      459,
+      252,
+      3,
+      233,
+      0,
+      "IMAGE"
+    ],
+    [
+      460,
+      252,
+      4,
+      247,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8478795658713514,
+      "offset": [
+        -139.94540915266282,
+        -141.86655902363717
+      ]
+    },
+    "frontendVersion": "1.41.21",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

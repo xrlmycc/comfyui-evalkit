@@ -55,7 +55,8 @@ OPTIONAL_ALIGNMENT_METRICS = ("disabled",) + ALIGNMENT_METRICS
 
 _METRIC_CACHE: Dict[Tuple[str, str], object] = {}
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff")
-COMPARE_MODES = ("original", "pad", "resize")
+BATCH_RESIZE_MODES = ("pad", "resize", "crop")
+COMPARE_MODES = ("separate", "pad", "resize", "crop")
 
 
 def _ensure_pkg_resources_compat():
@@ -354,10 +355,18 @@ def _load_prompt_text(image_path: str, prompt_folder_path: str):
     return "", "", "empty"
 
 
+def _normalize_compare_mode(compare_mode: str) -> str:
+    if compare_mode == "original":
+        return "separate"
+    return compare_mode
+
+
 def _resize_image_for_batch(image: Image.Image, target_width: int, target_height: int, resize_mode: str):
     image = image.convert("RGB")
     if resize_mode == "resize":
         return image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+    if resize_mode == "crop":
+        return ImageOps.fit(image, (target_width, target_height), Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
     contained = ImageOps.contain(image, (target_width, target_height), Image.Resampling.LANCZOS)
     background = Image.new("RGB", (target_width, target_height), (0, 0, 0))
@@ -380,13 +389,61 @@ def _load_image_tensor_from_path(image_path: str):
     return tensor, (int(original_width), int(original_height))
 
 
+def _stack_image_tensors(image_tensors):
+    normalized_items = []
+    for tensor in image_tensors:
+        batch_tensor = _ensure_batch_image(tensor)
+        for index in range(batch_tensor.shape[0]):
+            normalized_items.append(batch_tensor[index : index + 1])
+
+    if not normalized_items:
+        raise ValueError("没有可拼接的图片。")
+
+    max_height = max(item.shape[1] for item in normalized_items)
+    max_width = max(item.shape[2] for item in normalized_items)
+    stacked = []
+
+    for item in normalized_items:
+        height = item.shape[1]
+        width = item.shape[2]
+        if height == max_height and width == max_width:
+            stacked.append(item)
+            continue
+
+        canvas = torch.zeros(
+            (1, max_height, max_width, item.shape[3]),
+            dtype=item.dtype,
+            device=item.device,
+        )
+        offset_y = (max_height - height) // 2
+        offset_x = (max_width - width) // 2
+        canvas[:, offset_y : offset_y + height, offset_x : offset_x + width, :] = item
+        stacked.append(canvas)
+
+    return torch.cat(stacked, dim=0)
+
+
+def _build_ranked_images_output(image_tensors, compare_mode: str):
+    normalized_items = []
+    for tensor in image_tensors:
+        batch_tensor = _ensure_batch_image(tensor)
+        for index in range(batch_tensor.shape[0]):
+            normalized_items.append(batch_tensor[index : index + 1])
+
+    if not normalized_items:
+        raise ValueError("没有可输出的排名图片。")
+
+    return _stack_image_tensors(normalized_items)
+
+
 def _load_image_for_compare(image_path: str, compare_mode: str, target_width: int, target_height: int):
+    compare_mode = _normalize_compare_mode(compare_mode)
     with Image.open(image_path) as image_file:
         image_file = ImageOps.exif_transpose(image_file)
         original_width, original_height = image_file.size
         processed_image = image_file.convert("RGB")
 
-        if compare_mode in ("pad", "resize"):
+        if compare_mode in ("pad", "resize", "crop"):
             processed_image = _resize_image_for_batch(
                 processed_image,
                 target_width=target_width,
@@ -398,6 +455,102 @@ def _load_image_for_compare(image_path: str, compare_mode: str, target_width: in
         processed_width, processed_height = processed_image.size
 
     return tensor, (int(original_width), int(original_height)), (int(processed_width), int(processed_height))
+
+
+def _comfy_tensor_to_pil(image: torch.Tensor):
+    batch_image = _ensure_batch_image(image)
+    if batch_image.shape[0] != 1:
+        raise ValueError("转换 PIL 时只支持单张图片。")
+    image_array = (batch_image[0].detach().cpu().numpy().clip(0.0, 1.0) * 255.0).round().astype(np.uint8)
+    return Image.fromarray(image_array, mode="RGB")
+
+
+def _collect_image_entries(
+    image,
+    prompt: str = "",
+    compare_mode: str = "separate",
+    target_width: int = 1024,
+    target_height: int = 1024,
+):
+    compare_mode = _normalize_compare_mode(compare_mode)
+    batch_image = _ensure_batch_image(image)
+    prompt_values = _resolve_captions(prompt, batch_image.shape[0])
+    missing_prompt_count = sum(1 for value in prompt_values if not str(value).strip())
+    entries = []
+
+    for index in range(batch_image.shape[0]):
+        image_tensor = batch_image[index : index + 1]
+        original_height = int(image_tensor.shape[1])
+        original_width = int(image_tensor.shape[2])
+        processed_tensor = image_tensor
+        processed_width = original_width
+        processed_height = original_height
+
+        if compare_mode != "separate":
+            processed_image = _resize_image_for_batch(
+                _comfy_tensor_to_pil(image_tensor),
+                target_width=target_width,
+                target_height=target_height,
+                resize_mode=compare_mode,
+            )
+            processed_tensor = _pil_to_comfy_tensor(processed_image)
+            processed_width, processed_height = processed_image.size
+
+        entries.append(
+            {
+                "index": index,
+                "file_name": f"input_{index:04d}",
+                "image_path": "",
+                "prompt_text": prompt_values[index],
+                "prompt_source": "input",
+                "prompt_path": "",
+                "original_size": [original_width, original_height],
+                "processed_size": [int(processed_width), int(processed_height)],
+                "image_tensor": processed_tensor,
+            }
+        )
+
+    warnings = []
+    notice = ""
+    if missing_prompt_count > 0:
+        notice = f"检测到 {missing_prompt_count}/{len(entries)} 张输入图片缺少 prompt。"
+        warnings.append(notice)
+
+    return entries, {
+        "source_mode": "image",
+        "warnings": warnings,
+        "notice": notice,
+        "missing_prompt_count": missing_prompt_count,
+        "compare_mode": compare_mode,
+        "target_size": [int(target_width), int(target_height)],
+    }
+
+
+def _run_metric_on_entries(metric_name: str, entries, device_mode: str):
+    raw_scores = []
+    device = ""
+
+    for entry in entries:
+        scores, summary = _run_metric(metric_name, entry["image_tensor"], entry["prompt_text"], device_mode)
+        raw_scores.append(float(scores[0]))
+        device = str(summary["device"])
+
+    return raw_scores, {
+        "metric": metric_name,
+        "device": device,
+        "count": len(raw_scores),
+        "scores": raw_scores,
+        "mean": float(sum(raw_scores) / len(raw_scores)) if raw_scores else 0.0,
+        "min": float(min(raw_scores)) if raw_scores else 0.0,
+        "max": float(max(raw_scores)) if raw_scores else 0.0,
+    }
+
+
+def _resolve_metric_best_index(metric_result: Dict[str, object], fallback_index: int):
+    scores = metric_result.get("scores", [])
+    if not scores:
+        return int(fallback_index)
+    return int(max(range(len(scores)), key=lambda index: float(scores[index])))
 
 
 def _collect_folder_items(image_folder_path: str, prompt_folder_path: str = "", limit: int = 0):
@@ -518,6 +671,9 @@ class EvalKitMetricScore:
             },
             "optional": {
                 "prompt": ("STRING", {"default": "", "multiline": True}),
+                "compare_mode": (COMPARE_MODES, {"default": "separate"}),
+                "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
+                "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "device_mode": (("auto", "cpu"), {"default": "auto"}),
             },
         }
@@ -527,9 +683,52 @@ class EvalKitMetricScore:
     FUNCTION = "score"
     CATEGORY = "evaluation/evalkit"
 
-    def score(self, image, metric_name, prompt="", device_mode="auto"):
-        scores, summary = _run_metric(metric_name, image, prompt, device_mode)
-        report = _build_score_report(metric_name, scores, {"device": summary["device"]})
+    def score(
+        self,
+        image,
+        metric_name,
+        prompt="",
+        compare_mode="separate",
+        target_width=1024,
+        target_height=1024,
+        device_mode="auto",
+    ):
+        entries, context = _collect_image_entries(
+            image=image,
+            prompt=prompt,
+            compare_mode=compare_mode,
+            target_width=target_width,
+            target_height=target_height,
+        )
+        if metric_name in ALIGNMENT_METRICS and context["missing_prompt_count"] > 0:
+            raise ValueError("当前输入中存在缺少 prompt 的图片，无法执行对齐类单指标打分。")
+        scores, summary = _run_metric_on_entries(metric_name, entries, device_mode)
+        report_rows = [
+            {
+                "index": int(entry["index"]),
+                "file_name": entry["file_name"],
+                "image_path": entry["image_path"],
+                "prompt_text": entry["prompt_text"],
+                "prompt_source": entry["prompt_source"],
+                "prompt_path": entry["prompt_path"],
+                "score": float(scores[index]),
+                "original_size": entry["original_size"],
+                "processed_size": entry["processed_size"],
+            }
+            for index, entry in enumerate(entries)
+        ]
+        report = _build_score_report(
+            metric_name,
+            scores,
+            {
+                "device": summary["device"],
+                "source_mode": context["source_mode"],
+                "compare_mode": context["compare_mode"],
+                "target_size": context["target_size"],
+                "warnings": context["warnings"],
+                "items": report_rows,
+            },
+        )
         return (
             float(summary["mean"]),
             float(summary["min"]),
@@ -549,6 +748,9 @@ class EvalKitMetricRank:
             },
             "optional": {
                 "prompt": ("STRING", {"default": "", "multiline": True}),
+                "compare_mode": (COMPARE_MODES, {"default": "separate"}),
+                "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
+                "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "sort_mode": (("auto", "higher_better", "lower_better"), {"default": "auto"}),
                 "device_mode": (("auto", "cpu"), {"default": "auto"}),
             },
@@ -559,33 +761,67 @@ class EvalKitMetricRank:
     FUNCTION = "rank"
     CATEGORY = "evaluation/evalkit"
 
-    def rank(self, image, metric_name, prompt="", sort_mode="auto", device_mode="auto"):
-        batch_image = _ensure_batch_image(image)
-        scores, _ = _run_metric(metric_name, batch_image, prompt, device_mode)
+    def rank(
+        self,
+        image,
+        metric_name,
+        prompt="",
+        compare_mode="separate",
+        target_width=1024,
+        target_height=1024,
+        sort_mode="auto",
+        device_mode="auto",
+    ):
+        entries, context = _collect_image_entries(
+            image=image,
+            prompt=prompt,
+            compare_mode=compare_mode,
+            target_width=target_width,
+            target_height=target_height,
+        )
+        if metric_name in ALIGNMENT_METRICS and context["missing_prompt_count"] > 0:
+            raise ValueError("当前输入中存在缺少 prompt 的图片，无法执行对齐类单指标排名。")
+        scores, _ = _run_metric_on_entries(metric_name, entries, device_mode)
         lower_better = _metric_lower_better(metric_name, sort_mode)
         order = sorted(
             range(len(scores)),
             key=lambda index: scores[index],
             reverse=not lower_better,
         )
-        ranked_images = batch_image[order]
+        ranked_entries = [entries[index] for index in order]
+        ranked_images = _build_ranked_images_output([entry["image_tensor"] for entry in ranked_entries], compare_mode)
         best_index = int(order[0])
         best_score = float(scores[best_index])
         ranking = [
-            {"rank": rank + 1, "index": int(index), "score": float(scores[index])}
+            {
+                "rank": rank + 1,
+                "index": int(index),
+                "file_name": entries[index]["file_name"],
+                "image_path": entries[index]["image_path"],
+                "prompt_text": entries[index]["prompt_text"],
+                "prompt_source": entries[index]["prompt_source"],
+                "prompt_path": entries[index]["prompt_path"],
+                "score": float(scores[index]),
+                "original_size": entries[index]["original_size"],
+                "processed_size": entries[index]["processed_size"],
+            }
             for rank, index in enumerate(order)
         ]
         report = json.dumps(
             {
                 "metric": metric_name,
+                "source_mode": context["source_mode"],
+                "compare_mode": context["compare_mode"],
+                "target_size": context["target_size"],
                 "sort_mode": sort_mode,
                 "lower_better": lower_better,
+                "warnings": context["warnings"],
                 "ranking": ranking,
             },
             ensure_ascii=False,
             indent=2,
         )
-        return ranked_images, batch_image[best_index : best_index + 1], best_score, best_index, report
+        return ranked_images, entries[best_index]["image_tensor"], best_score, best_index, report
 
 
 class EvalKitPresetRank:
@@ -597,6 +833,9 @@ class EvalKitPresetRank:
             },
             "optional": {
                 "prompt": ("STRING", {"default": "", "multiline": True}),
+                "compare_mode": (COMPARE_MODES, {"default": "separate"}),
+                "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
+                "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "quality_metric": (OPTIONAL_QUALITY_METRICS, {"default": "qualiclip+"}),
                 "aesthetic_metric": (OPTIONAL_AESTHETIC_METRICS, {"default": "laion_aes"}),
                 "alignment_metric": (OPTIONAL_ALIGNMENT_METRICS, {"default": "clipscore"}),
@@ -607,15 +846,13 @@ class EvalKitPresetRank:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "FLOAT", "INT", "FLOAT", "FLOAT", "FLOAT", "STRING")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING")
     RETURN_NAMES = (
         "ranked_images",
         "best_image",
-        "best_combined_score",
-        "best_index",
-        "quality_mean",
-        "aesthetic_mean",
-        "alignment_mean",
+        "quality_image",
+        "aesthetic_image",
+        "alignment_image",
         "report",
     )
     FUNCTION = "rank"
@@ -625,6 +862,9 @@ class EvalKitPresetRank:
         self,
         image,
         prompt="",
+        compare_mode="separate",
+        target_width=1024,
+        target_height=1024,
         quality_metric="qualiclip+",
         aesthetic_metric="laion_aes",
         alignment_metric="clipscore",
@@ -633,7 +873,13 @@ class EvalKitPresetRank:
         alignment_weight=1.0,
         device_mode="auto",
     ):
-        batch_image = _ensure_batch_image(image)
+        entries, context = _collect_image_entries(
+            image=image,
+            prompt=prompt,
+            compare_mode=compare_mode,
+            target_width=target_width,
+            target_height=target_height,
+        )
         metric_specs = [
             ("quality", quality_metric, float(quality_weight)),
             ("aesthetic", aesthetic_metric, float(aesthetic_weight)),
@@ -641,7 +887,7 @@ class EvalKitPresetRank:
         ]
 
         metric_results = {}
-        combined = [0.0] * batch_image.shape[0]
+        combined = [0.0] * len(entries)
         total_weight = 0.0
 
         for metric_role, metric_name, weight in metric_specs:
@@ -655,7 +901,19 @@ class EvalKitPresetRank:
                 }
                 continue
 
-            scores, summary = _run_metric(metric_name, batch_image, prompt, device_mode)
+            if metric_name in ALIGNMENT_METRICS and context["missing_prompt_count"] > 0:
+                metric_results[metric_role] = {
+                    "metric": "disabled",
+                    "weight": 0.0,
+                    "scores": [],
+                    "normalized_scores": [],
+                    "mean": 0.0,
+                }
+                if "已自动关闭对齐类指标，本次综合排名不会计算 alignment_metric。" not in context["warnings"]:
+                    context["warnings"].append("已自动关闭对齐类指标，本次综合排名不会计算 alignment_metric。")
+                continue
+
+            scores, summary = _run_metric_on_entries(metric_name, entries, device_mode)
             normalized_scores = _normalize_scores(
                 scores,
                 lower_better=bool(METRIC_DEFINITIONS[metric_name]["lower_better"]),
@@ -677,9 +935,12 @@ class EvalKitPresetRank:
 
         combined = [value / total_weight for value in combined]
         order = sorted(range(len(combined)), key=lambda index: combined[index], reverse=True)
-        ranked_images = batch_image[order]
+        ranked_entries = [entries[index] for index in order]
+        ranked_images = _build_ranked_images_output([entry["image_tensor"] for entry in ranked_entries], compare_mode)
         best_index = int(order[0])
-        best_score = float(combined[best_index])
+        quality_best_index = _resolve_metric_best_index(metric_results["quality"], best_index)
+        aesthetic_best_index = _resolve_metric_best_index(metric_results["aesthetic"], best_index)
+        alignment_best_index = _resolve_metric_best_index(metric_results["alignment"], best_index)
         report_rows = []
 
         for rank, index in enumerate(order, start=1):
@@ -687,16 +948,34 @@ class EvalKitPresetRank:
                 {
                     "rank": rank,
                     "index": int(index),
+                    "file_name": entries[index]["file_name"],
+                    "image_path": entries[index]["image_path"],
+                    "prompt_text": entries[index]["prompt_text"],
+                    "prompt_source": entries[index]["prompt_source"],
+                    "prompt_path": entries[index]["prompt_path"],
                     "combined_score": float(combined[index]),
                     "quality_score": float(metric_results["quality"]["scores"][index]) if metric_results["quality"]["scores"] else None,
                     "aesthetic_score": float(metric_results["aesthetic"]["scores"][index]) if metric_results["aesthetic"]["scores"] else None,
                     "alignment_score": float(metric_results["alignment"]["scores"][index]) if metric_results["alignment"]["scores"] else None,
+                    "original_size": entries[index]["original_size"],
+                    "processed_size": entries[index]["processed_size"],
                 }
             )
 
         report = json.dumps(
             {
+                "source_mode": context["source_mode"],
+                "compare_mode": context["compare_mode"],
+                "target_size": context["target_size"],
+                "best_index": best_index,
+                "best_combined_score": float(combined[best_index]),
+                "metric_best_indexes": {
+                    "quality": quality_best_index,
+                    "aesthetic": aesthetic_best_index,
+                    "alignment": alignment_best_index,
+                },
                 "metrics": metric_results,
+                "warnings": context["warnings"],
                 "ranking": report_rows,
                 "total_weight": total_weight,
             },
@@ -706,12 +985,10 @@ class EvalKitPresetRank:
 
         return (
             ranked_images,
-            batch_image[best_index : best_index + 1],
-            best_score,
-            best_index,
-            float(metric_results["quality"]["mean"]),
-            float(metric_results["aesthetic"]["mean"]),
-            float(metric_results["alignment"]["mean"]),
+            entries[best_index]["image_tensor"],
+            entries[quality_best_index]["image_tensor"],
+            entries[aesthetic_best_index]["image_tensor"],
+            entries[alignment_best_index]["image_tensor"],
             report,
         )
 
@@ -791,7 +1068,7 @@ class EvalKitBatchLoadFromPath:
                 "image_folder_path": ("STRING", {"default": "", "multiline": False}),
                 "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
-                "resize_mode": (("pad", "resize"), {"default": "pad"}),
+                "resize_mode": (BATCH_RESIZE_MODES, {"default": "pad"}),
             },
             "optional": {
                 "prompt_folder_path": ("STRING", {"default": "", "multiline": False}),
@@ -888,7 +1165,7 @@ class EvalKitMetricRankFromPath:
             "optional": {
                 "prompt_folder_path": ("STRING", {"default": "", "multiline": False}),
                 "limit": ("INT", {"default": 0, "min": 0, "max": 100000, "step": 1}),
-                "compare_mode": (COMPARE_MODES, {"default": "original"}),
+                "compare_mode": (COMPARE_MODES, {"default": "separate"}),
                 "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "sort_mode": (("auto", "higher_better", "lower_better"), {"default": "auto"}),
@@ -896,8 +1173,8 @@ class EvalKitMetricRankFromPath:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "FLOAT", "STRING", "STRING", "INT", "STRING", "STRING")
-    RETURN_NAMES = ("best_image", "best_score", "best_filename", "best_prompt", "best_index", "report", "notice")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "FLOAT", "STRING", "STRING", "INT", "STRING", "STRING")
+    RETURN_NAMES = ("ranked_images", "best_image", "best_score", "best_filename", "best_prompt", "best_index", "report", "notice")
     FUNCTION = "rank"
     CATEGORY = "evaluation/evalkit"
 
@@ -907,12 +1184,13 @@ class EvalKitMetricRankFromPath:
         metric_name,
         prompt_folder_path="",
         limit=0,
-        compare_mode="original",
+        compare_mode="separate",
         target_width=1024,
         target_height=1024,
         sort_mode="auto",
         device_mode="auto",
     ):
+        compare_mode = _normalize_compare_mode(compare_mode)
         items, folder_path, prompt_path = _collect_folder_items(image_folder_path, prompt_folder_path, limit)
         warnings, notice, missing_prompt_count = _collect_prompt_warnings(items, prompt_path)
         if metric_name in ALIGNMENT_METRICS and missing_prompt_count > 0:
@@ -942,6 +1220,7 @@ class EvalKitMetricRankFromPath:
                     "score": float(scores[0]),
                     "original_size": list(original_size),
                     "processed_size": list(processed_size),
+                    "_image_tensor": image_tensor,
                 }
             )
 
@@ -950,12 +1229,10 @@ class EvalKitMetricRankFromPath:
             row["rank"] = rank_index
 
         best_row = ranking[0]
-        best_image, _, _ = _load_image_for_compare(
-            best_row["image_path"],
-            compare_mode,
-            target_width,
-            target_height,
-        )
+        ranked_images = _build_ranked_images_output([row["_image_tensor"] for row in ranking], compare_mode)
+        best_image = best_row["_image_tensor"]
+        for row in ranking:
+            row.pop("_image_tensor", None)
         report = json.dumps(
             {
                 "image_folder_path": folder_path,
@@ -974,6 +1251,7 @@ class EvalKitMetricRankFromPath:
         )
 
         return (
+            ranked_images,
             best_image,
             float(best_row["score"]),
             best_row["file_name"],
@@ -994,7 +1272,7 @@ class EvalKitPresetRankFromPath:
             "optional": {
                 "prompt_folder_path": ("STRING", {"default": "", "multiline": False}),
                 "limit": ("INT", {"default": 0, "min": 0, "max": 100000, "step": 1}),
-                "compare_mode": (COMPARE_MODES, {"default": "original"}),
+                "compare_mode": (COMPARE_MODES, {"default": "separate"}),
                 "target_width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "target_height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
                 "quality_metric": (OPTIONAL_QUALITY_METRICS, {"default": "qualiclip+"}),
@@ -1007,16 +1285,15 @@ class EvalKitPresetRankFromPath:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "FLOAT", "STRING", "STRING", "INT", "FLOAT", "FLOAT", "FLOAT", "STRING", "STRING")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING", "STRING", "IMAGE", "IMAGE", "IMAGE", "STRING", "STRING")
     RETURN_NAMES = (
+        "ranked_images",
         "best_image",
-        "best_combined_score",
         "best_filename",
         "best_prompt",
-        "best_index",
-        "quality_mean",
-        "aesthetic_mean",
-        "alignment_mean",
+        "quality_image",
+        "aesthetic_image",
+        "alignment_image",
         "report",
         "notice",
     )
@@ -1028,7 +1305,7 @@ class EvalKitPresetRankFromPath:
         image_folder_path,
         prompt_folder_path="",
         limit=0,
-        compare_mode="original",
+        compare_mode="separate",
         target_width=1024,
         target_height=1024,
         quality_metric="qualiclip+",
@@ -1039,14 +1316,16 @@ class EvalKitPresetRankFromPath:
         alignment_weight=1.0,
         device_mode="auto",
     ):
+        compare_mode = _normalize_compare_mode(compare_mode)
         items, folder_path, prompt_path = _collect_folder_items(image_folder_path, prompt_folder_path, limit)
         warnings, notice, missing_prompt_count = _collect_prompt_warnings(items, prompt_path)
         effective_alignment_metric = alignment_metric
         effective_alignment_weight = float(alignment_weight)
         if effective_alignment_metric != "disabled" and effective_alignment_weight > 0 and missing_prompt_count > 0:
-            warnings.append("已自动关闭对齐类指标，本次综合排名不会计算 alignment_metric。")
-            effective_alignment_metric = "disabled"
-            effective_alignment_weight = 0.0
+            raise ValueError(
+                "当前目录中存在缺少 prompt 的图片，无法稳定输出 best_image 与 alignment_image。"
+                " 请关闭 alignment_metric，或提供完整的 prompt_folder_path / 同名 txt / 图片元数据 prompt。"
+            )
         metric_specs = [
             ("quality", quality_metric, float(quality_weight)),
             ("aesthetic", aesthetic_metric, float(aesthetic_weight)),
@@ -1128,8 +1407,16 @@ class EvalKitPresetRankFromPath:
             row["rank"] = rank_index
 
         best_row = ranking[0]
-        best_image = best_row.pop("_image_tensor")
-        for row in ranking[1:]:
+        best_index = int(best_row["index"])
+        quality_best_index = _resolve_metric_best_index(metric_results["quality"], best_index)
+        aesthetic_best_index = _resolve_metric_best_index(metric_results["aesthetic"], best_index)
+        alignment_best_index = _resolve_metric_best_index(metric_results["alignment"], best_index)
+        ranked_images = _build_ranked_images_output([row["_image_tensor"] for row in ranking], compare_mode)
+        best_image = best_row["_image_tensor"]
+        quality_image = processed_entries[quality_best_index]["image_tensor"]
+        aesthetic_image = processed_entries[aesthetic_best_index]["image_tensor"]
+        alignment_image = processed_entries[alignment_best_index]["image_tensor"]
+        for row in ranking:
             row.pop("_image_tensor", None)
 
         report = json.dumps(
@@ -1138,6 +1425,13 @@ class EvalKitPresetRankFromPath:
                 "prompt_folder_path": prompt_path,
                 "compare_mode": compare_mode,
                 "target_size": [int(target_width), int(target_height)],
+                "best_index": best_index,
+                "best_combined_score": float(best_row["combined_score"]),
+                "metric_best_indexes": {
+                    "quality": quality_best_index,
+                    "aesthetic": aesthetic_best_index,
+                    "alignment": alignment_best_index,
+                },
                 "metrics": metric_results,
                 "count": len(ranking),
                 "warnings": warnings,
@@ -1148,14 +1442,13 @@ class EvalKitPresetRankFromPath:
         )
 
         return (
+            ranked_images,
             best_image,
-            float(best_row["combined_score"]),
             best_row["file_name"],
             best_row["prompt_text"],
-            int(best_row["index"]),
-            float(metric_results["quality"]["mean"]),
-            float(metric_results["aesthetic"]["mean"]),
-            float(metric_results["alignment"]["mean"]),
+            quality_image,
+            aesthetic_image,
+            alignment_image,
             report,
             notice,
         )
